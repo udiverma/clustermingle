@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Model with Options</title>
+    
+    <!-- Link to Google Fonts for custom font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@700&display=swap">
+
+    <!-- A-Frame and AR.js Libraries -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.1.0/aframe/build/aframe-ar.min.js"></script>
+    <style>
+        .buttons-container {
+            display: flex;
+            justify-content: center;
+            position: fixed;
+            bottom: 50px;
+            z-index: 1000;
+            gap: 12px;
+            max-width: 56%; 
+        }
+
+        .option-button {
+            padding: 15px 40px;
+            border: none;
+            background-color: #350377;
+            color: #fcfcfc;
+            cursor: pointer;
+            border-radius: 12px;
+            max-width: 56%; 
+
+        }
+
+        #timer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #fcfcfc;
+            background-color: #350377;
+            padding: 10px 15px;
+            border-radius: 8px;
+            z-index: 1000;
+            font-family: 'Roboto', sans-serif; 
+        }
+
+        #correctCounter {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #fcfcfc;
+            background-color: #350377;
+            padding: 10px 15px;
+            border-radius: 8px;
+            z-index: 1000;
+            font-family: 'Roboto', sans-serif; 
+        }
+
+        .correct {
+            background-color: green !important;
+        }
+        .incorrect {
+            background-color: red !important;
+        }
+    </style>
+</head>
+<body style="margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center;">
+
+    <!-- AR Scene Setup -->
+    <a-scene embedded arjs>
+        <!-- Define assets (including the GLTF model) -->
+        <a-assets>
+            <a-asset-item id="ps5Model" src="question_mark_block_super_mario_bros/scene.gltf"></a-asset-item>
+        </a-assets>
+
+        <!-- Marker Setup with 'hiro' preset -->
+        <a-marker preset="hiro">
+            <a-entity gltf-model="#ps5Model" position="0 0 0" scale="0.0017 0.0017 0.0017" rotation="0 180 0"></a-entity>
+            <a-text id="questionText" value="Loading question..."
+                    position="0 2.1 0"
+                    rotation="0 0 0"
+                    color="#000000"  
+                    align="center"
+                    width="3" 
+                    scale="0.8 0.8 0.8"
+                    opacity="0.9"
+                    font="https://cdn.aframe.io/fonts/mozillavr.fnt"
+                    whiteSpace="pre-wrap">
+            </a-text>
+        </a-marker>
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <!-- Timer Display -->
+    <div id="timer">15</div>
+
+    <!-- Correct Answer Counter -->
+    <div id="correctCounter">Correct: 0</div>
+
+    <!-- Buttons for Options A, B, and C -->
+    <div class="buttons-container">
+        <button id="optionA" class="option-button" onclick="handleOption('A')">Option A</button>
+        <button id="optionB" class="option-button" onclick="handleOption('B')">Option B</button>
+        <button id="optionC" class="option-button" onclick="handleOption('C')">Option C</button>
+    </div>
+
+    <script>
+        let timerInterval;
+        let correctAnswersCount = 0;
+//hooks up with api riddle endpoint and grabs question and answer
+        async function fetchQuestion() {
+            try {
+                // Use the localhost URL for local testing on the same machine (browser and server are on the same network).
+                // Use the ngrok URL for testing on external devices (like a phone) or sharing with others on different networks,
+                // since localhost is only accessible on the local machine.
+                const response = await fetch("https://2d6a-108-28-173-204.ngrok-free.app/api/riddle"); //this is the ngrok url needed for when i was testing with ngrok
+                // const response = await fetch("http://localhost:8098/api/riddle"); // Use this for local testing
+
+                const riddle = await response.json();
+             
+                document.querySelector('#questionText').setAttribute("value", riddle.riddle);
+                document.getElementById("optionA").textContent = riddle.option_a;
+                document.getElementById("optionB").textContent = riddle.option_b;
+                document.getElementById("optionC").textContent = riddle.option_c;
+
+                document.querySelectorAll('.option-button').forEach(button => {
+                    button.classList.remove('correct', 'incorrect');
+                });
+
+                window.correctOption = riddle.correct_option;
+                window.correctAnswerText = riddle[`option_${riddle.correct_option.toLowerCase()}`];
+                resetTimer();
+                startTimer();
+            } catch (error) {
+                console.error("Error fetching question:", error);
+            }
+        }
+//timer, set starting timer amount here
+        function startTimer() {
+            let timeLeft = 15;
+            document.getElementById('timer').textContent = timeLeft;
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').textContent = timeLeft;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    revealAnswer();
+                    setTimeout(fetchQuestion, 2000);
+                }
+            }, 1000);
+        }
+// reset timer, set time after reset here
+        function resetTimer() {
+            clearInterval(timerInterval);
+            document.getElementById('timer').textContent = "15";
+        }
+//reveal correct and incorrect answer
+        function revealAnswer() {
+            document.getElementById("optionA").classList.add('incorrect');
+            document.getElementById("optionB").classList.add('incorrect');
+            document.getElementById("optionC").classList.add('incorrect');
+            document.getElementById(`option${window.correctOption}`).classList.remove('incorrect');
+            document.getElementById(`option${window.correctOption}`).classList.add('correct');
+        }
+
+        function handleOption(selectedOption) {
+            clearInterval(timerInterval);
+
+            if (selectedOption === window.correctOption) {
+                correctAnswersCount++;
+                document.getElementById('correctCounter').textContent = `Correct: ${correctAnswersCount}`;
+            }
+            revealAnswer();
+            setTimeout(fetchQuestion, 2000);
+        }
+
+        window.addEventListener('load', fetchQuestion);
+    </script>
+
+</body>
+</html>
